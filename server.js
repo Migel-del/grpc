@@ -2,6 +2,7 @@ import grpc from "@grpc/grpc-js";
 import protoLoader from "@grpc/proto-loader";
 import fetch from "node-fetch";
 import dotenv from "dotenv";
+import express from "express";
 
 dotenv.config();
 
@@ -12,11 +13,12 @@ if (!BACKEND_URL) {
   process.exit(1);
 }
 
+// ====== gRPC DEFINITIONS ======
 const PROTO_PATH = "./service.proto";
 const packageDefinition = protoLoader.loadSync(PROTO_PATH);
 const proto = grpc.loadPackageDefinition(packageDefinition).marznode;
 
-// ====== ПРОКСИ ФУНКЦИИ ======
+// ====== UTILS ======
 async function forwardToBackend(method, body) {
   const url = `${BACKEND_URL}/${method}`;
   try {
@@ -89,7 +91,6 @@ const impl = {
     }
   },
 
-  // ===== Stream примеры =====
   StreamBackendLogs(call) {
     forwardToBackend("StreamBackendLogs", call.request)
       .then((lines) => {
@@ -105,7 +106,7 @@ const impl = {
       });
   },
 
-  // ===== Пример заглушки для SyncUsers =====
+  // --- Поток SyncUsers (заглушка для панели)
   SyncUsers(stream) {
     stream.on("data", (data) => {
       console.log("[SyncUsers] got user:", data.user?.username);
@@ -126,3 +127,9 @@ server.bindAsync(
     console.log(`→ Forwarding to backend: ${BACKEND_URL}`);
   }
 );
+
+// ====== EXPRESS HEALTHCHECK ======
+const app = express();
+app.get("/", (_, res) => res.send("OK"));
+app.get("/health", (_, res) => res.send("healthy"));
+app.listen(8080, () => console.log("HTTP healthcheck running on :8080"));

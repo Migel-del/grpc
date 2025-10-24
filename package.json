@@ -1,0 +1,9 @@
+{
+  "name": "grpc-h2-bridge",
+  "version": "1.0.0",
+  "description": "Transparent HTTP/2 (gRPC) reverse proxy to HTTPS(h2) backend with path prefix",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "dependencies": {
+  }
+}

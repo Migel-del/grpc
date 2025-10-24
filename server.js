@@ -3,21 +3,30 @@ import protoLoader from "@grpc/proto-loader";
 import fetch from "node-fetch";
 import dotenv from "dotenv";
 import express from "express";
+import pkg from "grpc-server-reflection";   // ← единственный импорт reflection
+const { extend } = pkg;                     // ← сразу достаём extend
 
 dotenv.config();
 
-const GRPC_PORT = 5566; // внутренний порт gRPC, для панели
+const GRPC_PORT = 5566;
 const BACKEND_URL = process.env.BACKEND_URL;
+
 if (!BACKEND_URL) {
   console.error("❌ BACKEND_URL not set in .env");
   process.exit(1);
 }
 
 const PROTO_PATH = "./service.proto";
-const packageDefinition = protoLoader.loadSync(PROTO_PATH);
+const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
+  keepCase: true,
+  longs: String,
+  enums: String,
+  defaults: true,
+  oneofs: true,
+});
 const proto = grpc.loadPackageDefinition(packageDefinition).marznode;
 
-// ====== Функция форварда к ноде ======
+// ====== Проксирование ======
 async function forwardToBackend(method, body) {
   const url = `${BACKEND_URL}/${method}`;
   try {
@@ -40,54 +49,42 @@ const impl = {
     try {
       const result = await forwardToBackend("RepopulateUsers", call.request);
       callback(null, result);
-    } catch (e) {
-      callback(e);
-    }
+    } catch (e) { callback(e); }
   },
 
   async FetchUsersStats(call, callback) {
     try {
       const result = await forwardToBackend("FetchUsersStats", {});
       callback(null, result);
-    } catch (e) {
-      callback(e);
-    }
+    } catch (e) { callback(e); }
   },
 
   async FetchBackends(call, callback) {
     try {
       const result = await forwardToBackend("FetchBackends", {});
       callback(null, result);
-    } catch (e) {
-      callback(e);
-    }
+    } catch (e) { callback(e); }
   },
 
   async RestartBackend(call, callback) {
     try {
       const result = await forwardToBackend("RestartBackend", call.request);
       callback(null, result);
-    } catch (e) {
-      callback(e);
-    }
+    } catch (e) { callback(e); }
   },
 
   async FetchBackendConfig(call, callback) {
     try {
       const result = await forwardToBackend("FetchBackendConfig", call.request);
       callback(null, result);
-    } catch (e) {
-      callback(e);
-    }
+    } catch (e) { callback(e); }
   },
 
   async GetBackendStats(call, callback) {
     try {
       const result = await forwardToBackend("GetBackendStats", call.request);
       callback(null, result);
-    } catch (e) {
-      callback(e);
-    }
+    } catch (e) { callback(e); }
   },
 
   StreamBackendLogs(call) {
@@ -105,7 +102,6 @@ const impl = {
       });
   },
 
-  // --- поток SyncUsers (заглушка)
   SyncUsers(stream) {
     stream.on("data", (data) => {
       console.log("[SyncUsers] got user:", data.user?.username);
@@ -114,9 +110,13 @@ const impl = {
   },
 };
 
-// ====== gRPC-сервер ======
+// ====== gRPC сервер ======
 const server = new grpc.Server();
 server.addService(proto.MarzService.service, impl);
+
+// добавляем reflection API
+extend(server, { marznode: proto });
+
 server.bindAsync(
   `0.0.0.0:${GRPC_PORT}`,
   grpc.ServerCredentials.createInsecure(),
@@ -127,12 +127,12 @@ server.bindAsync(
   }
 );
 
-// ====== EXPRESS HEALTHCHECK ======
+// ====== Express healthcheck ======
 const app = express();
 app.get("/", (_, res) => res.send("OK"));
 app.get("/health", (_, res) => res.send("healthy"));
 
-const httpPort = process.env.PORT || 8080; // Timeweb подставит сюда свой порт
+const httpPort = process.env.PORT || 8080;
 app.listen(httpPort, () =>
-  console.log(`HTTP healthcheck running on :${httpPort}`)
+  console.log(`🌐 HTTP healthcheck running on :${httpPort}`)
 );

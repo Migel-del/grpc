@@ -129,7 +129,12 @@ server.bindAsync(
 );
 
 // ====== EXPRESS HEALTHCHECK ======
+import express from "express";
 const app = express();
 app.get("/", (_, res) => res.send("OK"));
 app.get("/health", (_, res) => res.send("healthy"));
-app.listen(8080, () => console.log("HTTP healthcheck running on :8080"));
+
+const httpPort = process.env.PORT || 8080;
+app.listen(httpPort, () =>
+  console.log(`HTTP healthcheck running on :${httpPort}`)
+);

@@ -1,0 +1,28 @@
+syntax = "proto3";
+package marznode;
+
+service MarzService {
+  rpc SyncUsers (stream UserData) returns (stream Empty);
+  rpc RepopulateUsers (UsersData) returns (Empty);
+  rpc FetchUsersStats (Empty) returns (UsersStats);
+  rpc FetchBackends (Empty) returns (Backends);
+  rpc StreamBackendLogs (BackendLogsRequest) returns (stream BackendLogLine);
+  rpc RestartBackend (RestartBackendRequest) returns (Empty);
+  rpc FetchBackendConfig (Backend) returns (BackendConfig);
+  rpc GetBackendStats (Backend) returns (BackendStats);
+}
+
+message Empty {}
+message User { int32 id = 1; string username = 2; string key = 3; }
+message Inbound { string tag = 1; }
+message UserData { User user = 1; repeated Inbound inbounds = 2; }
+message UsersData { repeated UserData users_data = 1; }
+message UsersStats { repeated UserStat users_stats = 1; }
+message UserStat { string username = 1; double upload = 2; double download = 3; }
+message Backend { string name = 1; }
+message BackendConfig { string configuration = 1; int32 config_format = 2; }
+message BackendLogsRequest { string backend_name = 1; bool include_buffer = 2; }
+message BackendLogLine { string line = 1; }
+message RestartBackendRequest { string backend_name = 1; BackendConfig config = 2; }
+message BackendStats { string backend_name = 1; uint64 connections = 2; uint64 errors = 3; double cpu = 4; double memory = 5; }
+message Backends { repeated Backend backends = 1; }

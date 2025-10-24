@@ -6,19 +6,18 @@ import express from "express";
 
 dotenv.config();
 
-const PORT = process.env.PORT || 5566;
+const GRPC_PORT = 5566; // внутренний порт gRPC, для панели
 const BACKEND_URL = process.env.BACKEND_URL;
 if (!BACKEND_URL) {
   console.error("❌ BACKEND_URL not set in .env");
   process.exit(1);
 }
 
-// ====== gRPC DEFINITIONS ======
 const PROTO_PATH = "./service.proto";
 const packageDefinition = protoLoader.loadSync(PROTO_PATH);
 const proto = grpc.loadPackageDefinition(packageDefinition).marznode;
 
-// ====== UTILS ======
+// ====== Функция форварда к ноде ======
 async function forwardToBackend(method, body) {
   const url = `${BACKEND_URL}/${method}`;
   try {
@@ -35,7 +34,7 @@ async function forwardToBackend(method, body) {
   }
 }
 
-// ====== gRPC IMPLEMENTATION ======
+// ====== Реализация gRPC ======
 const impl = {
   async RepopulateUsers(call, callback) {
     try {
@@ -106,7 +105,7 @@ const impl = {
       });
   },
 
-  // --- Поток SyncUsers (заглушка для панели)
+  // --- поток SyncUsers (заглушка)
   SyncUsers(stream) {
     stream.on("data", (data) => {
       console.log("[SyncUsers] got user:", data.user?.username);
@@ -115,15 +114,15 @@ const impl = {
   },
 };
 
-// ====== gRPC SERVER ======
+// ====== gRPC-сервер ======
 const server = new grpc.Server();
 server.addService(proto.MarzService.service, impl);
 server.bindAsync(
-  `0.0.0.0:${PORT}`,
+  `0.0.0.0:${GRPC_PORT}`,
   grpc.ServerCredentials.createInsecure(),
   () => {
     server.start();
-    console.log(`✅ MarzProxy gRPC server running on port ${PORT}`);
+    console.log(`✅ MarzProxy gRPC server running on port ${GRPC_PORT}`);
     console.log(`→ Forwarding to backend: ${BACKEND_URL}`);
   }
 );
@@ -132,4 +131,8 @@ server.bindAsync(
 const app = express();
 app.get("/", (_, res) => res.send("OK"));
 app.get("/health", (_, res) => res.send("healthy"));
-app.listen(8080, () => console.log("HTTP healthcheck running on :8080"));
+
+const httpPort = process.env.PORT || 8080; // Timeweb подставит сюда свой порт
+app.listen(httpPort, () =>
+  console.log(`HTTP healthcheck running on :${httpPort}`)
+);
